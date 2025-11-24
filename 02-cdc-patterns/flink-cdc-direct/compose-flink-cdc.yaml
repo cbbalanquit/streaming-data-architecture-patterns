@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  sql-client:
+    image: flink:1.20-scala_2.12
+    container_name: flink-sql-client
+    hostname: sql-client
+    depends_on:
+      - jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        rest.address: jobmanager
+    volumes:
+      - ./flink-libs:/opt/flink/lib
+      - iceberg-data:/tmp/iceberg
+    command: 
+      - /bin/bash
+      - -c
+      - |
+        echo "Flink SQL Client ready. Use: docker exec -it flink-sql-client /opt/flink/bin/sql-client.sh"
+        tail -f /dev/null
+    networks:
+      - cdc_network
+      - iceberg_net
+
+  jobmanager:
+    image: flink:1.20-scala_2.12
+    container_name: flink-jobmanager
+    hostname: jobmanager
+    ports:
+      - "8082:8081"
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+    volumes:
+      - ./flink-libs:/opt/flink/lib
+      - iceberg-data:/tmp/iceberg
+    networks:
+      - cdc_network
+      - iceberg_net
+
+  taskmanager:
+    image: flink:1.20-scala_2.12
+    container_name: flink-taskmanager
+    hostname: taskmanager
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    volumes:
+      - ./flink-libs:/opt/flink/lib
+      - iceberg-data:/tmp/iceberg
+    networks:
+      - cdc_network
+      - iceberg_net
+
+volumes:
+  iceberg-data:
+
+networks:
+  cdc_network:
+    external: true
+  iceberg_net:
+    external: true

@@ -1,0 +1,5 @@
+networks:
+  cdc_network:
+    driver: bridge
+  iceberg_net:
+    driver: bridge

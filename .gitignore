@@ -1,0 +1,45 @@
+# MySQL init scripts (large dump files)
+01-sources/mysql/init-scripts/*.sql
+
+# Flink JAR files (download separately)
+02-cdc-patterns/flink-cdc-direct/lib/*.jar
+
+# Environment files with secrets
+env/common.env
+env/*.env
+!env/*.env.example
+
+# Versioned backup files
+*.v[0-9]*.yaml
+
+# Docker volumes and data
+*_data/
+
+# Logs
+*.log
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+*.egg-info/
+dist/
+build/
+
+# Node.js (if using any JS tools)
+node_modules/
+package-lock.json
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
