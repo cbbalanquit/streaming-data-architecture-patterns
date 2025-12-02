@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   sql-client:
     image: flink:1.20-scala_2.12
@@ -13,12 +11,13 @@ services:
         jobmanager.rpc.address: jobmanager
         rest.address: jobmanager
     volumes:
-      - ./flink-libs:/opt/flink/lib
+      - ./lib:/opt/flink/usrlib
       - iceberg-data:/tmp/iceberg
-    command: 
+    command:
       - /bin/bash
       - -c
       - |
+        cp /opt/flink/usrlib/*.jar /opt/flink/lib/
         echo "Flink SQL Client ready. Use: docker exec -it flink-sql-client /opt/flink/bin/sql-client.sh"
         tail -f /dev/null
     networks:
@@ -31,14 +30,19 @@ services:
     hostname: jobmanager
     ports:
       - "8082:8081"
-    command: jobmanager
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
     volumes:
-      - ./flink-libs:/opt/flink/lib
+      - ./lib:/opt/flink/usrlib
       - iceberg-data:/tmp/iceberg
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cp /opt/flink/usrlib/*.jar /opt/flink/lib/
+        /docker-entrypoint.sh jobmanager
     networks:
       - cdc_network
       - iceberg_net
@@ -49,15 +53,20 @@ services:
     hostname: taskmanager
     depends_on:
       - jobmanager
-    command: taskmanager
     environment:
       - |
         FLINK_PROPERTIES=
         jobmanager.rpc.address: jobmanager
         taskmanager.numberOfTaskSlots: 2
     volumes:
-      - ./flink-libs:/opt/flink/lib
+      - ./lib:/opt/flink/usrlib
       - iceberg-data:/tmp/iceberg
+    command:
+      - /bin/bash
+      - -c
+      - |
+        cp /opt/flink/usrlib/*.jar /opt/flink/lib/
+        /docker-entrypoint.sh taskmanager
     networks:
       - cdc_network
       - iceberg_net

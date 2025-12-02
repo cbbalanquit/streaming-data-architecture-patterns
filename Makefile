@@ -24,6 +24,12 @@ help:
 	@echo "  make full-flink-cdc      - Deploy MySQL→Flink CDC→Iceberg+StarRocks"
 	@echo "  make full-debezium       - Deploy MySQL→Debezium→Kafka→Flink→Iceberg+StarRocks"
 	@echo ""
+	@echo "Phase 1 exploration targets:"
+	@echo "  make phase1-setup1       - Deploy Setup 1 (MySQL + Flink CDC Direct)"
+	@echo "  make phase1-setup2       - Deploy Setup 2 (MySQL + Debezium + Kafka + Flink)"
+	@echo "  make phase1-test         - Create test data in MySQL"
+	@echo "  make phase1-down         - Stop all Phase 1 components"
+	@echo ""
 	@echo "Utility targets:"
 	@echo "  make ps                  - List all running containers"
 	@echo "  make urls                - Show all service URLs"
@@ -139,3 +145,70 @@ check:
 backup-list:
 	@echo "Versioned backup files:"
 	@find . -name '*.v[0-9]*.yaml' -type f 2>/dev/null || echo "No backups found"
+
+# Phase 1: MySQL CDC Exploration targets
+.PHONY: phase1-setup1 phase1-setup2 phase1-test phase1-down
+
+phase1-setup1:
+	@echo "=== Phase 1: Setup 1 (Flink CDC Direct) ==="
+	@echo "Starting infrastructure and MySQL..."
+	@bash scripts/deploy.sh infra
+	@bash scripts/deploy.sh mysql
+	@echo ""
+	@echo "Starting Flink CDC Direct..."
+	@bash scripts/deploy.sh flink-cdc
+	@echo ""
+	@echo "✓ Setup 1 is ready!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Access Flink Web UI: http://localhost:8082"
+	@echo "  2. Connect to SQL Client: docker exec -it flink-sql-client /opt/flink/bin/sql-client.sh"
+	@echo "  3. Run test data: make phase1-test"
+
+phase1-setup2:
+	@echo "=== Phase 1: Setup 2 (Debezium + Kafka + Flink) ==="
+	@echo "Starting infrastructure and MySQL..."
+	@bash scripts/deploy.sh infra
+	@bash scripts/deploy.sh mysql
+	@echo ""
+	@echo "Starting Debezium + Kafka + Flink..."
+	@bash scripts/deploy.sh debezium
+	@echo ""
+	@echo "Waiting for services to be ready..."
+	@sleep 5
+	@echo ""
+	@echo "✓ Setup 2 is ready!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "  1. Configure Debezium connector (see README)"
+	@echo "  2. Access Kafka UI: http://localhost:8080"
+	@echo "  3. Access Flink Web UI: http://localhost:8081"
+	@echo "  4. Run test data: make phase1-test"
+
+phase1-test:
+	@echo "=== Inserting test data into active.tenants ==="
+	@docker exec -i mysql mysql -uappuser -papppassword active <<-EOF
+	-- Insert test tenant data
+	INSERT INTO tenants (name, street_number, street_name, suburb, state, postcode, country_id, timezone) VALUES
+	  ('Acme Corp', '123', 'Main Street', 'Sydney', 'NSW', '2000', 1, 'Australia/Sydney'),
+	  ('Tech Solutions', '456', 'Elizabeth Street', 'Melbourne', 'VIC', '3000', 1, 'Australia/Melbourne'),
+	  ('Data Analytics Ltd', '789', 'Queen Street', 'Brisbane', 'QLD', '4000', 1, 'Australia/Brisbane');
+
+	-- Show inserted data
+	SELECT id, name, suburb, state FROM tenants ORDER BY id DESC LIMIT 3;
+	EOF
+	@echo ""
+	@echo "✓ Test data inserted into active.tenants!"
+	@echo ""
+	@echo "Now trigger some CDC events:"
+	@echo "  docker exec -it mysql mysql -uappuser -papppassword active"
+	@echo "  UPDATE tenants SET suburb = 'Surry Hills', postcode = '2010' WHERE name = 'Acme Corp';"
+	@echo "  INSERT INTO tenants (name, street_number, street_name, suburb, state, postcode, country_id, timezone)"
+	@echo "    VALUES ('Global Services', '321', 'George Street', 'Perth', 'WA', '6000', 1, 'Australia/Perth');"
+
+phase1-down:
+	@echo "=== Stopping Phase 1 setups ==="
+	@bash scripts/teardown.sh flink-cdc 2>/dev/null || true
+	@bash scripts/teardown.sh debezium 2>/dev/null || true
+	@bash scripts/teardown.sh mysql 2>/dev/null || true
+	@echo "✓ Phase 1 components stopped (networks preserved)"
